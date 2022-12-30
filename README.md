@@ -1,0 +1,1 @@
+The [ICS-10 Grandpa Client](https://github.com/cosmos/ibc/blob/main/spec/client/ics-010-grandpa-client/README.md) implementation.
