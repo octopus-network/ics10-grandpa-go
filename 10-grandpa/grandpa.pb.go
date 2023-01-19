@@ -71,7 +71,7 @@ var xxx_messageInfo_ClientState proto.InternalMessageInfo
 // Actual payload items
 type PayloadItem struct {
 	// 2-byte payload id
-	PayloadId *[32]byte `protobuf:"bytes,1,opt,name=payload_id,json=payloadId,proto3,customtype=SizedByte2" json:"payload_id,omitempty"`
+	PayloadId *SizedByte2 `protobuf:"bytes,1,opt,name=payload_id,json=payloadId,proto3,customtype=SizedByte2" json:"payload_id,omitempty"`
 	// arbitrary length payload data., eg mmr_root_hash
 	PayloadData []byte `protobuf:"bytes,2,opt,name=payload_data,json=payloadData,proto3" json:"payload_data,omitempty"`
 }
@@ -383,11 +383,11 @@ var xxx_messageInfo_ParachainHeader proto.InternalMessageInfo
 // Partial data for MmrLeaf
 type BeefyMmrLeafPartial struct {
 	// leaf version
-	Version uint8 `protobuf:"varint,1,opt,name=version,proto3,customtype=U8" json:"version"`
+	Version U8 `protobuf:"varint,1,opt,name=version,proto3,customtype=U8" json:"version"`
 	// parent block for this leaf
 	ParentNumber uint32 `protobuf:"varint,2,opt,name=parent_number,json=parentNumber,proto3" json:"parent_number,omitempty"`
 	// parent hash for this leaf
-	ParentHash *[32]byte `protobuf:"bytes,3,opt,name=parent_hash,json=parentHash,proto3,customtype=SizedByte32" json:"parent_hash,omitempty"`
+	ParentHash *SizedByte32 `protobuf:"bytes,3,opt,name=parent_hash,json=parentHash,proto3,customtype=SizedByte32" json:"parent_hash,omitempty"`
 	// next authority set.
 	BeefyNextAuthoritySet BeefyAuthoritySet `protobuf:"bytes,4,opt,name=beefy_next_authority_set,json=beefyNextAuthoritySet,proto3" json:"beefy_next_authority_set"`
 }
@@ -423,7 +423,7 @@ type BeefyAuthoritySet struct {
 	// size of the authority set
 	Len uint32 `protobuf:"varint,2,opt,name=len,proto3" json:"len,omitempty"`
 	// merkle root of the sorted authority public keys.
-	AuthorityRoot *[32]byte `protobuf:"bytes,3,opt,name=authority_root,json=authorityRoot,proto3,customtype=SizedByte32" json:"authority_root,omitempty"`
+	AuthorityRoot *SizedByte32 `protobuf:"bytes,3,opt,name=authority_root,json=authorityRoot,proto3,customtype=SizedByte32" json:"authority_root,omitempty"`
 }
 
 func (m *BeefyAuthoritySet) Reset()         { *m = BeefyAuthoritySet{} }
@@ -453,15 +453,15 @@ var xxx_messageInfo_BeefyAuthoritySet proto.InternalMessageInfo
 // BeefyMmrLeaf leaf data
 type BeefyMmrLeaf struct {
 	// leaf version
-	Version uint8 `protobuf:"varint,1,opt,name=version,proto3,customtype=U8" json:"version"`
+	Version U8 `protobuf:"varint,1,opt,name=version,proto3,customtype=U8" json:"version"`
 	// parent block for this leaf
 	ParentNumber uint32 `protobuf:"varint,2,opt,name=parent_number,json=parentNumber,proto3" json:"parent_number,omitempty"`
 	// parent hash for this leaf
-	ParentHash *[32]byte `protobuf:"bytes,3,opt,name=parent_hash,json=parentHash,proto3,customtype=SizedByte32" json:"parent_hash,omitempty"`
+	ParentHash *SizedByte32 `protobuf:"bytes,3,opt,name=parent_hash,json=parentHash,proto3,customtype=SizedByte32" json:"parent_hash,omitempty"`
 	// beefy next authority set.
 	BeefyNextAuthoritySet BeefyAuthoritySet `protobuf:"bytes,4,opt,name=beefy_next_authority_set,json=beefyNextAuthoritySet,proto3" json:"beefy_next_authority_set"`
 	// merkle root hash of parachain heads included in the leaf.
-	ParachainHeads *[32]byte `protobuf:"bytes,5,opt,name=parachain_heads,json=parachainHeads,proto3,customtype=SizedByte32" json:"parachain_heads,omitempty"`
+	ParachainHeads *SizedByte32 `protobuf:"bytes,5,opt,name=parachain_heads,json=parachainHeads,proto3,customtype=SizedByte32" json:"parachain_heads,omitempty"`
 }
 
 func (m *BeefyMmrLeaf) Reset()         { *m = BeefyMmrLeaf{} }

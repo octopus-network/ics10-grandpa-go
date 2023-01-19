@@ -3,6 +3,7 @@ package grandpa
 import (
 	time "time"
 
+	
 	ics23 "github.com/confio/ics23/go"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -125,4 +126,39 @@ func (cs ClientState) VerifyNonMembership(
 func verifyDelayPeriodPassed(ctx sdk.Context, store sdk.KVStore, proofHeight exported.Height, delayTimePeriod, delayBlockPeriod uint64) error {
 
 	return nil
+}
+
+// GetLeafIndexForBlockNumber given the MmrLeafPartial.ParentNumber & BeefyActivationBlock,
+func (cs ClientState) GetLeafIndexForBlockNumber(blockNumber uint32) uint32 {
+	var leafIndex uint32
+
+	// calculate the leafIndex for this leaf.
+	if cs.BeefyActivationBlock == 0 {
+		// in this case the leaf index is the same as the block number - 1 (leaf index starts at 0)
+		leafIndex = blockNumber - 1
+	} else {
+		// in this case the leaf index is activation block - current block number.
+		leafIndex = cs.BeefyActivationBlock - (blockNumber + 1)
+	}
+
+	return leafIndex
+}
+
+func (cs ClientState) GetBlockNumberForLeaf(leafIndex uint32) uint32 {
+	var blockNumber uint32
+
+	// calculate the leafIndex for this leaf.
+	if cs.BeefyActivationBlock == 0 {
+		// in this case the leaf index is the same as the block number - 1 (leaf index starts at 0)
+		blockNumber = leafIndex + 1
+	} else {
+		// in this case the leaf index is activation block - current block number.
+		blockNumber = cs.BeefyActivationBlock + leafIndex
+	}
+
+	return blockNumber
+}
+
+func authoritiesThreshold(authoritySet BeefyAuthoritySet) uint32 {
+	return 2*authoritySet.Len/3 + 1
 }
