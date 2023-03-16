@@ -1,4 +1,4 @@
-module github.com/octopus-network/grandpa-go
+module github.com/octopus-network/ics10-grandpa-go
 
 go 1.18
 

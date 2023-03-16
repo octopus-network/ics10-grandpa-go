@@ -17,8 +17,8 @@ import (
 	// "github.com/centrifuge/go-substrate-rpc-client/v4/xxhash"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	grandpa "github.com/octopus-network/grandpa-go/10-grandpa"
-	"github.com/octopus-network/grandpa-go/util"
+	grandpa "github.com/octopus-network/ics10-grandpa-go/types"
+	"github.com/octopus-network/ics10-grandpa-go/util"
 	"github.com/stretchr/testify/require"
 )
 

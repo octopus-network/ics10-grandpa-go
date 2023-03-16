@@ -13,7 +13,7 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/xxhash"
 	"github.com/ethereum/go-ethereum/crypto"
-	grandpa "github.com/octopus-network/grandpa-go/10-grandpa"
+	grandpa "github.com/octopus-network/ics10-grandpa-go/types"
 )
 
 func GetBeefyAuthorities(blockHash types.Hash, api *gsrpc.SubstrateAPI, method string) ([][]byte, error) {
