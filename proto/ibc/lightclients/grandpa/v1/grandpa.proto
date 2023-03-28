@@ -1,0 +1,242 @@
+syntax = "proto3";
+
+package ibc.lightclients.grandpa.v1;
+
+option go_package = "github.com/cosmos/ibc-go/v7/modules/light-clients/10-grandpa/types";
+
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+
+// chain type
+// enum ChainType {
+//   // subchain
+//   CHAIN_TYPE_SUBCHAIN_UNSPECIFIED = 0;
+//   // parachain
+//   CHAIN_TYPE_PARACHAIN = 1;
+// }
+
+// ClientState from Beefy tracks the current validator set, latest height,
+// and a possible frozen height.
+message ClientState {
+  option (gogoproto.goproto_getters) = false;
+
+  // 0: subchain
+  // 1: parachain
+  uint32 chain_type = 1;
+  // chain_id string type, eg: ibc-1
+  string chain_id = 2;
+  // parachain id is uint type
+  uint32 parachain_id = 3;
+  // block number that the beefy protocol was activated on the relay chain.
+  // This should be the first block in the merkle-mountain-range tree.
+  uint32 beefy_activation_block = 4;
+  // the latest mmr_root_hash height
+  uint32 latest_beefy_height = 5;
+  // Latest mmr root hash
+  bytes mmr_root_hash = 6;
+  // latest subchain or parachain height
+  uint32 latest_chain_height = 7;
+  // Block height when the client was frozen due to a misbehaviour
+  uint32 frozen_height = 8;
+  // authorities for the current round
+  BeefyAuthoritySet authority_set = 9 [(gogoproto.nullable) = false];
+  // authorities for the next round
+  BeefyAuthoritySet next_authority_set = 10 [(gogoproto.nullable) = false];
+}
+
+// Beefy Authority Info
+message BeefyAuthoritySet {
+  option (gogoproto.goproto_getters) = false;
+
+  // Id of the authority set, it should be strictly increasing
+  uint64 id = 1;
+  // Number of validators in the set.
+  uint32 len = 2;
+  // Merkle Root Hash build from BEEFY uncompressed AuthorityIds.
+  bytes root = 3;
+}
+
+// Actual payload items
+message PayloadItem {
+  // 2-byte payload id
+  bytes id = 1;
+  // arbitrary length payload data., eg mmr_root_hash
+  bytes data = 2;
+}
+
+// Commitment message signed by beefy validators
+message Commitment {
+  option (gogoproto.goproto_getters) = false;
+
+  // array of payload items signed by Beefy validators
+  repeated PayloadItem payloads = 1 [(gogoproto.nullable) = false];
+  // block number for this commitment
+  uint32 block_number = 2;
+  // validator set that signed this commitment
+  uint64 validator_set_id = 3;
+}
+
+// Signature with it`s index in merkle tree
+message Signature {
+  option (gogoproto.goproto_getters) = false;
+  // signature leaf index in the merkle tree.
+  uint32 index = 1;
+  // signature bytes
+  bytes signature = 2;
+}
+
+// signed commitment data
+message SignedCommitment {
+  option (gogoproto.goproto_getters) = false;
+
+  // commitment data being signed
+  Commitment commitment = 1 [(gogoproto.nullable) = false];
+  // all the signatures
+  repeated Signature signatures = 2 [(gogoproto.nullable) = false];
+}
+
+// mmr data
+message BeefyMMR {
+  option (gogoproto.goproto_getters) = false;
+
+  // signed commitment data
+  SignedCommitment signed_commitment = 1 [(gogoproto.nullable) = false];
+  // build merkle tree based on all the signature in signed commitment
+  // and generate the signature proof
+  repeated bytes signature_proofs = 2;
+  // mmr proof
+  MMRLeavesAndBatchProof mmr_leaves_and_batch_proof = 3 [(gogoproto.nullable) = false];
+  // size of the mmr for the given proof
+  uint64 mmr_size = 4;
+}
+
+// mmr leaves and proofs
+message MMRLeavesAndBatchProof {
+  // mmr leaves
+  repeated MMRLeaf leaves = 1 [(gogoproto.nullable) = false];
+  // mmr batch proof
+  MMRBatchProof mmr_batch_proof = 2 [(gogoproto.nullable) = false];
+}
+
+// MmrLeaf leaf data
+message MMRLeaf {
+  option (gogoproto.goproto_getters) = false;
+
+  // leaf version
+  uint32 version = 1;
+  // // parent block for this leaf
+  // uint32 parent_number = 2;
+  // // parent hash for this leaf
+  // bytes parent_hash = 3;
+  // parent number and hash
+  ParentNumberAndHash parent_number_and_hash = 2 [(gogoproto.nullable) = false];
+  // beefy next authority set.
+  BeefyAuthoritySet beefy_next_authority_set = 3 [(gogoproto.nullable) = false];
+  // merkle root hash of parachain heads included in the leaf.
+  bytes parachain_heads = 4;
+}
+
+// parent number and hash
+message ParentNumberAndHash {
+  // parent block for this leaf
+  uint32 parent_number = 1;
+  // parent hash for this leaf
+  bytes parent_hash = 2;
+}
+
+// mmr batch proof
+message MMRBatchProof {
+  // The index of the leaf the proof is for.
+  repeated uint64 leaf_indexes = 1;
+  // Number of leaves in MMR, when the proof was generated.
+  uint64 leaf_count = 2;
+  // Proof elements (hashes of siblings of inner nodes on the path to the leaf).
+  repeated bytes items = 3;
+}
+
+// ConsensusState
+message ConsensusState {
+  option (gogoproto.goproto_getters) = false;
+
+  // timestamp that corresponds to the block height in which the ConsensusState
+  // was stored.
+  google.protobuf.Timestamp timestamp = 1 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  // parachain header.state_root that used to verify chain storage proof
+  bytes root = 2;
+}
+
+// subchain header map
+message SubchainHeaderMap {
+  // LatestMMR latest_mmr = 1;
+  // map<blocknumber,scale-encoded blockheader>
+  map<uint32, SubchainHeader> subchain_header_map = 1 [(gogoproto.nullable) = false];
+  // map<uint32,Timestamp> timestamp_map=2;
+}
+
+// subchain header
+message SubchainHeader {
+  option (gogoproto.goproto_getters) = false;
+  // scale-encoded subchain header bytes
+  bytes block_header = 1;
+  // timestamp and proof
+  StateProof timestamp = 2 [(gogoproto.nullable) = false];
+}
+/// Parachain headers and their merkle proofs.
+message ParachainHeaderMap {
+  // map<blocknumber,ParachainHeader>
+  map<uint32, ParachainHeader> parachain_header_map = 1 [(gogoproto.nullable) = false];
+  //  map<uint32,Timestamp> timestamp_map=2;
+}
+
+// data needed to prove parachain header inclusion in mmr
+message ParachainHeader {
+  option (gogoproto.goproto_getters) = false;
+
+  // para id
+  uint32 parachain_id = 1;
+  // scale-encoded parachain header bytes
+  bytes block_header = 2;
+  // proofs for parachain header in the mmr_leaf.parachain_heads
+  repeated bytes proofs = 3;
+  // merkle leaf index for parachain heads proof
+  uint32 header_index = 4;
+  // total number of para heads in parachain_heads_root
+  uint32 header_count = 5;
+
+  // timestamp and proof
+  StateProof timestamp = 6 [(gogoproto.nullable) = false];
+}
+
+// state value and proof
+message StateProof {
+  // state key
+  bytes key = 1;
+  // the state value
+  bytes value = 2;
+  // these proof gets from parachain by rpc methord:state_getReadProof
+  repeated bytes proofs = 3;
+}
+
+// header wrapper
+message Header {
+  // the latest mmr data
+  BeefyMMR beefy_mmr = 1 [(gogoproto.nullable) = false];
+  // only one header
+  oneof message {
+    // subchain headers and their proofs
+    SubchainHeaderMap subchain_header_map = 2;
+    // parachain headers and their proofs
+    ParachainHeaderMap parachain_header_map = 3;
+  }
+}
+
+// Misbehaviour is a wrapper over two conflicting Headers
+// that implements Misbehaviour interface expected by ICS-02
+message Misbehaviour {
+  option (gogoproto.goproto_getters) = false;
+  string client_id                   = 1 [(gogoproto.moretags) = "yaml:\"client_id\""];
+  Header header_1                    = 2
+      [(gogoproto.nullable) = false, (gogoproto.customname) = "Header1", (gogoproto.moretags) = "yaml:\"header_1\""];
+  Header header_2 = 3
+      [(gogoproto.nullable) = false, (gogoproto.customname) = "Header2", (gogoproto.moretags) = "yaml:\"header_2\""];
+}

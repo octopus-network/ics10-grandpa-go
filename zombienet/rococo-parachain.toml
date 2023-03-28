@@ -1,0 +1,73 @@
+[settings]
+node_spawn_timeout = 120
+provider = "native"
+timeout = 600
+
+[relaychain]
+default_command = "polkadot"
+default_args = [ 
+        "-lparachain=debug",
+        "-lbeefy=debug",
+        "--beefy",
+        "--enable-offchain-indexing=true",
+        "--detailed-log-output"
+        ]
+chain = "rococo-local"
+
+	[[relaychain.nodes]]
+	name = "alice"
+    validator = true
+	rpc_port = 30444
+    ws_port = 9944
+    args = [
+        "--rpc-external",
+        "--ws-external",
+        ]
+
+	[[relaychain.nodes]]
+	name = "bob"
+	validator = true
+
+	[[relaychain.nodes]]
+	name = "charlie"
+	validator = true
+
+	[[relaychain.nodes]]
+	name = "dave"
+	validator = true
+
+	[[relaychain.nodes]]
+	name = "eve"
+	validator = true
+
+[[parachains]]
+id = 2222
+chain = "statemine-local"
+# chain = "local-testnet"
+cumulus_based = true
+
+	# run Ferdie as parachain collator
+	[[parachains.collators]]
+    command = "polkadot-parachain"
+    args = [
+        "--force-authoring",
+        "--rpc-external",
+        "--ws-external",
+        "--detailed-log-output"
+        ]
+	name = "Ferdie"
+	validator = true
+    rpc_port = 32200
+    ws_port = 9988
+    [[parachains.collators.env]]
+    name = "RUST_LOG"
+    value = "runtime=debug,parachain=trace,cumulus-collator=trace,aura=trace,xcm=trace"
+
+	# run Boern as parachain collator
+	[[parachains.collators]]
+    command = "polkadot-parachain"
+	name = "Boern"
+	validator = true
+    [[parachains.collators.env]]
+    name = "RUST_LOG"
+    value = "runtime=debug,parachain=trace,cumulus-collator=trace,aura=trace,xcm=trace"
