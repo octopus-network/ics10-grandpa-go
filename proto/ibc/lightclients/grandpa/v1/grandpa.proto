@@ -2,18 +2,11 @@ syntax = "proto3";
 
 package ibc.lightclients.grandpa.v1;
 
-option go_package = "github.com/cosmos/ibc-go/v7/modules/light-clients/10-grandpa/types";
+option go_package = "github.com/octopus-network/ics10-grandpa-go/grandpa;grandpa";
 
+import "ibc/core/client/v1/client.proto";
 import "google/protobuf/timestamp.proto";
 import "gogoproto/gogo.proto";
-
-// chain type
-// enum ChainType {
-//   // subchain
-//   CHAIN_TYPE_SUBCHAIN_UNSPECIFIED = 0;
-//   // parachain
-//   CHAIN_TYPE_PARACHAIN = 1;
-// }
 
 // ClientState from Beefy tracks the current validator set, latest height,
 // and a possible frozen height.
@@ -29,15 +22,18 @@ message ClientState {
   uint32 parachain_id = 3;
   // block number that the beefy protocol was activated on the relay chain.
   // This should be the first block in the merkle-mountain-range tree.
-  uint32 beefy_activation_block = 4;
+  uint32 beefy_activation_height = 4;
   // the latest mmr_root_hash height
-  uint32 latest_beefy_height = 5;
+  ibc.core.client.v1.Height latest_beefy_height = 5 [(gogoproto.nullable) = false];
+  ;
   // Latest mmr root hash
   bytes mmr_root_hash = 6;
   // latest subchain or parachain height
-  uint32 latest_chain_height = 7;
+  ibc.core.client.v1.Height latest_chain_height = 7 [(gogoproto.nullable) = false];
+  ;
   // Block height when the client was frozen due to a misbehaviour
-  uint32 frozen_height = 8;
+  ibc.core.client.v1.Height frozen_height = 8 [(gogoproto.nullable) = false];
+  ;
   // authorities for the current round
   BeefyAuthoritySet authority_set = 9 [(gogoproto.nullable) = false];
   // authorities for the next round
@@ -176,10 +172,12 @@ message SubchainHeaderMap {
 // subchain header
 message SubchainHeader {
   option (gogoproto.goproto_getters) = false;
+  // chain_id string type, eg: ibc-1,astar-1
+  string chain_id = 1;
   // scale-encoded subchain header bytes
-  bytes block_header = 1;
+  bytes block_header = 2;
   // timestamp and proof
-  StateProof timestamp = 2 [(gogoproto.nullable) = false];
+  StateProof timestamp = 3 [(gogoproto.nullable) = false];
 }
 /// Parachain headers and their merkle proofs.
 message ParachainHeaderMap {
@@ -191,20 +189,21 @@ message ParachainHeaderMap {
 // data needed to prove parachain header inclusion in mmr
 message ParachainHeader {
   option (gogoproto.goproto_getters) = false;
-
-  // para id
-  uint32 parachain_id = 1;
+  // chain_id string type, eg: ibc-1,astar-1
+  string chain_id = 1;
+  // para id must be uint
+  uint32 parachain_id = 2;
   // scale-encoded parachain header bytes
-  bytes block_header = 2;
+  bytes block_header = 3;
   // proofs for parachain header in the mmr_leaf.parachain_heads
-  repeated bytes proofs = 3;
+  repeated bytes proofs = 4;
   // merkle leaf index for parachain heads proof
-  uint32 header_index = 4;
+  uint32 header_index = 5;
   // total number of para heads in parachain_heads_root
-  uint32 header_count = 5;
+  uint32 header_count = 6;
 
   // timestamp and proof
-  StateProof timestamp = 6 [(gogoproto.nullable) = false];
+  StateProof timestamp = 7 [(gogoproto.nullable) = false];
 }
 
 // state value and proof

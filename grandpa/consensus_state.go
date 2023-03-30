@@ -31,14 +31,11 @@ func (ConsensusState) ClientType() string {
 // GetRoot returns the commitment Root for the specific
 func (cs ConsensusState) GetRoot() exported.Root {
 	return commitmenttypes.NewMerkleRoot([]byte(cs.Root))
-
 }
 
-// GetTimestamp returns block time in nanoseconds of the header that created consensus state
+// GetTimestamp returns block time in milli of the header that created consensus state
 func (cs ConsensusState) GetTimestamp() uint64 {
-
 	return uint64(cs.Timestamp.UnixMilli())
-
 }
 
 // ValidateBasic defines a basic validation for the tendermint consensus state.

@@ -14,5 +14,4 @@ func (suite *GrandpaTestSuite) TestCheckSubstituteAndUpdateState() {
 
 func (suite *GrandpaTestSuite) TestIsMatchingClientState() {
 	suite.T().Skip("todo: impl proposal handle!")
-
 }

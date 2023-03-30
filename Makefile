@@ -2,7 +2,7 @@
 
 PROJECTNAME=$(shell basename "$(PWD)")
 COMPANY=Octopus Network
-NAME=trie-go
+NAME=ics10-grandpa-go
 ifndef VERSION
 VERSION=latest
 endif
@@ -17,11 +17,25 @@ help: Makefile
 	@sed -n 's/^##//p' $< | column -t -s ':' |  sed -e 's/^/ /'
 	@echo
 
-.PHONY: lint
-lint:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.48
-	golangci-lint run
+proto-gen:
+	@echo "Generating Protobuf files"
+	@ ./scripts/compile-ics10-pb.sh
 
+###############################################################################
+###                                Linting                                  ###
+###############################################################################
+
+lint:
+	golangci-lint run --out-format=tab
+
+lint-fix:
+	golangci-lint run --fix --out-format=tab --issues-exit-code=0
+.PHONY: lint lint-fix
+
+format:
+	find . -name '*.go' -type f -not -path "./vendor*" -not -path "*.git*" -not -path "./docs/client/statik/statik.go" -not -path "./tests/mocks/*" -not -name '*.pb.go' -not -name '*.pb.gw.go' | xargs gofumpt -w
+	find . -name '*.go' -type f -not -path "./vendor*" -not -path "*.git*" -not -path "./docs/client/statik/statik.go" -not -path "./tests/mocks/*" -not -name '*.pb.go' -not -name '*.pb.gw.go' | xargs misspell -w
+.PHONY: format
 
 ## test: Runs `go test` on project test files.
 test:

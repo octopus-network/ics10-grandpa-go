@@ -2,7 +2,7 @@ package grandpa
 
 import (
 	"errors"
-	"time"
+	fmt "fmt"
 
 	gsrpctypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	gsrpccodec "github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
@@ -10,6 +10,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
+	host "github.com/cosmos/ibc-go/v7/modules/core/24-host"
 	"github.com/cosmos/ibc-go/v7/modules/core/exported"
 	"github.com/octopus-network/beefy-go/beefy"
 )
@@ -19,34 +20,34 @@ func (cs *ClientState) VerifyClientMessage(
 	ctx sdk.Context, cdc codec.BinaryCodec, clientStore sdk.KVStore,
 	clientMsg exported.ClientMessage,
 ) error {
-	panic("")
+	switch msg := clientMsg.(type) {
+	case *Header:
+		return cs.verifyHeader(ctx, clientStore, cdc, msg)
+
+	case *Misbehaviour:
+		return cs.verifyMisbehaviour(ctx, clientStore, cdc, msg)
+	default:
+		return clienttypes.ErrInvalidClientType
+	}
 }
 
 // step1: verify signature
 // step2: verify mmr
 // step3: verfiy header
-// step4: update client state and consensuse state
-func (cs ClientState) CheckHeaderAndUpdateState(
-	ctx sdk.Context, cdc codec.BinaryCodec, clientStore sdk.KVStore,
-	header exported.ClientMessage,
-) (exported.ClientState, exported.ConsensusState, error) {
-	ctx.Logger().Debug("LightClient:", "10-Grandpa", "method:", "CheckHeaderAndUpdateState")
+func (cs ClientState) verifyHeader(
+	ctx sdk.Context, clientStore sdk.KVStore, cdc codec.BinaryCodec,
+	header *Header,
+) error {
+	ctx.Logger().Debug("LightClient:", "10-Grandpa", "method:", "verifyHeader")
 
-	pbHeader, ok := header.(*Header)
-	if !ok {
-		return nil, nil, sdkerrors.Wrapf(
-			clienttypes.ErrInvalidHeader, "expected type %T, got %T", &Header{}, header,
-		)
-	}
-
-	beefyMMR := pbHeader.BeefyMmr
+	beefyMMR := header.BeefyMmr
 
 	// step1:  verify signature
 	// convert signedcommitment
 	bsc := ToBeefySC(beefyMMR.SignedCommitment)
 	err := cs.VerifySignatures(bsc, beefyMMR.SignatureProofs)
 	if err != nil {
-		return nil, nil, sdkerrors.Wrap(err, "failed to verify signatures")
+		return sdkerrors.Wrap(err, "failed to verify signatures")
 	}
 
 	// step2: verify mmr
@@ -57,38 +58,25 @@ func (cs ClientState) CheckHeaderAndUpdateState(
 	// verify mmr
 	err = cs.VerifyMMR(bsc, beefyMMR.MmrSize, beefyMMRLeaves, beefyBatchProof)
 	if err != nil {
-		return nil, nil, sdkerrors.Wrap(err, "failed to verify mmr")
+		return sdkerrors.Wrap(err, "failed to verify mmr")
 	}
 
 	// step3: verify header
-	err = cs.VerifyHeader(*pbHeader, beefyMMRLeaves)
+	err = cs.CheckHeader(*header, beefyMMRLeaves)
 	if err != nil {
-		return nil, nil, sdkerrors.Wrap(err, "failed to verify header")
+		return sdkerrors.Wrap(err, "failed to verify header")
 	}
 
-	// step4: update state
-	// update client state and build new client state
-	newClientState, err := cs.UpdateClientState(ctx, beefyMMR.SignedCommitment.Commitment, beefyMMR.MmrLeavesAndBatchProof.Leaves)
-	if err != nil {
-		return nil, nil, err
-	}
-	// update consensue state and build latest new consensue state
-	newConsensusState, err := cs.UpdateConsensusStates(ctx, cdc, clientStore, pbHeader)
-	if err != nil {
-		return nil, nil, err
-	}
-	return newClientState, newConsensusState, nil
+	return nil
 }
 
 // verify signatures
 func (cs ClientState) VerifySignatures(bsc beefy.SignedCommitment, SignatureProofs [][]byte) error {
-
 	// checking signatures Threshold
 	if beefy.SignatureThreshold(cs.AuthoritySet.Len) > uint32(len(bsc.Signatures)) ||
 		beefy.SignatureThreshold(cs.NextAuthoritySet.Len) > uint32(len(bsc.Signatures)) {
 
 		return sdkerrors.Wrap(errors.New("verify signature error "), ErrInvalidValidatorSet.Error())
-
 	}
 	// verify signatures
 	switch bsc.Commitment.ValidatorSetID {
@@ -110,13 +98,14 @@ func (cs ClientState) VerifySignatures(bsc beefy.SignedCommitment, SignatureProo
 
 // verify batch mmr proof
 func (cs ClientState) VerifyMMR(bsc beefy.SignedCommitment, mmrSize uint64,
-	beefyMMRLeaves []gsrpctypes.MMRLeaf, mmrBatchProof beefy.MMRBatchProof) error {
+	beefyMMRLeaves []gsrpctypes.MMRLeaf, mmrBatchProof beefy.MMRBatchProof,
+) error {
 	// check mmr height
-	if bsc.Commitment.BlockNumber <= cs.LatestBeefyHeight {
+	if bsc.Commitment.BlockNumber <= uint32(cs.LatestBeefyHeight.RevisionHeight) {
 		return sdkerrors.Wrap(errors.New("Commitment.BlockNumber < cs.LatestBeefyHeight"), "")
 	}
 
-	//verify mmr proof
+	// verify mmr proof
 	result, err := beefy.VerifyMMRBatchProof(bsc.Commitment.Payload, mmrSize, beefyMMRLeaves, mmrBatchProof)
 	if err != nil || !result {
 		return sdkerrors.Wrap(errors.New("failed to verify mmr proof"), "")
@@ -125,15 +114,14 @@ func (cs ClientState) VerifyMMR(bsc beefy.SignedCommitment, mmrSize uint64,
 }
 
 // verify solochain header or parachain header
-func (cs ClientState) VerifyHeader(gpHeader Header, beefyMMRLeaves []gsrpctypes.MMRLeaf,
+func (cs ClientState) CheckHeader(gpHeader Header, beefyMMRLeaves []gsrpctypes.MMRLeaf,
 ) error {
-
 	switch cs.ChainType {
 	case beefy.CHAINTYPE_SOLOCHAIN:
-		Logger.Debug("verify solochain header")
+		logger.Sugar().Debug("verify solochain header")
 
 		headerMap := gpHeader.GetSubchainHeaderMap()
-		// convert pb solochain header to beefy solochain header
+		// convert pb solochain header to beefy subchain header
 		beefySubchainHeaderMap := make(map[uint32]beefy.SubchainHeader)
 		for num, header := range headerMap.SubchainHeaderMap {
 			beefySubchainHeaderMap[num] = beefy.SubchainHeader{
@@ -147,7 +135,7 @@ func (cs ClientState) VerifyHeader(gpHeader Header, beefyMMRLeaves []gsrpctypes.
 		}
 
 	case beefy.CHAINTYPE_PARACHAIN:
-		Logger.Debug("verify parachain header")
+		logger.Sugar().Debug("verify parachain header")
 
 		headerMap := gpHeader.GetParachainHeaderMap()
 		// convert pb parachain header to beefy parachain header
@@ -170,13 +158,30 @@ func (cs ClientState) VerifyHeader(gpHeader Header, beefyMMRLeaves []gsrpctypes.
 	return nil
 }
 
-// update client state
-func (cs ClientState) UpdateClientState(ctx sdk.Context, commitment Commitment, mmrLeaves []MMRLeaf) (*ClientState, error) {
-	ctx.Logger().Debug("update client state")
-	// var newClientState *ClientState
+// UpdateState may be used to either create a consensus state for:
+// - a future height greater than the latest client state height
+// - a past height that was skipped during bisection
+// If we are updating to a past height, a consensus state is created for that height to be persisted in client store
+// If we are updating to a future height, the consensus state is created and the client state is updated to reflect
+// the new latest height
+// A list containing the updated consensus height is returned.
+// UpdateState must only be used to update within a single revision, thus header revision number and trusted height's revision
+// number must be the same. To update to a new revision, use a separate upgrade path
+// UpdateState will prune the oldest consensus state if it is expired.
+func (cs ClientState) UpdateState(ctx sdk.Context, cdc codec.BinaryCodec, clientStore sdk.KVStore, clientMsg exported.ClientMessage) []exported.Height {
+	header, ok := clientMsg.(*Header)
+	if !ok {
+		panic(fmt.Errorf("expected type %T, got %T", &Header{}, clientMsg))
+	}
+	chainID, latestHeader, _, err := getLastestChainHeader(header)
 
-	latestBeefyHeight := commitment.BlockNumber
-	latestChainHeight := latestBeefyHeight
+	beefyMMR := header.BeefyMmr
+	commitment := beefyMMR.SignedCommitment.Commitment
+	mmrLeaves := beefyMMR.MmrLeavesAndBatchProof.Leaves
+	// var newClientState *ClientState
+	latestBeefyHeight := clienttypes.NewHeight(clienttypes.ParseChainID(chainID), uint64(commitment.BlockNumber))
+	// latestBeefyHeight := commitment.BlockNumber
+	latestChainHeight := clienttypes.NewHeight(clienttypes.ParseChainID(chainID), uint64(latestHeader.Number))
 	mmrRoot := commitment.Payloads[0].Data
 
 	// find latest next authority set from mmrleaves
@@ -191,25 +196,32 @@ func (cs ClientState) UpdateClientState(ctx sdk.Context, commitment Commitment, 
 				Root: leaf.BeefyNextAuthoritySet.Root,
 			}
 		}
-
 	}
 
 	newClientState := NewClientState(cs.ChainType, cs.ChainId,
-		cs.ParachainId, cs.BeefyActivationBlock,
+		cs.ParachainId, cs.BeefyActivationHeight,
 		latestBeefyHeight, mmrRoot, latestChainHeight,
 		cs.FrozenHeight, *latestNextAuthoritySet, cs.NextAuthoritySet)
+	// save client state
+	setClientState(clientStore, cdc, newClientState)
 
-	return newClientState, nil
+	// update consensue state and return all the updated heights
+	updatedHeights, err := cs.UpdateConsensusStates(ctx, cdc, clientStore, header)
+	if err != nil {
+		return []exported.Height{}
+	}
 
+	return updatedHeights
 }
 
 // TODO: save all the consensue state at height,but just return latest block header
-func (cs ClientState) UpdateConsensusStates(ctx sdk.Context, cdc codec.BinaryCodec, clientStore sdk.KVStore, header *Header) (*ConsensusState, error) {
-
-	var newConsensueState *ConsensusState
+func (cs ClientState) UpdateConsensusStates(ctx sdk.Context, cdc codec.BinaryCodec, clientStore sdk.KVStore, header *Header) ([]exported.Height, error) {
+	// var newConsensueState *ConsensusState
+	var latestChainid string
 	var latestChainHeight uint32
-	var latestBlockHeader gsrpctypes.Header
-	var latestTimestamp uint64
+	// var latestBlockHeader gsrpctypes.Header
+	// var latestTimestamp uint64
+	var updatedHeights []exported.Height
 	switch cs.ChainType {
 	case beefy.CHAINTYPE_SOLOCHAIN:
 		subchainHeaderMap := header.GetSubchainHeaderMap().SubchainHeaderMap
@@ -224,16 +236,19 @@ func (cs ClientState) UpdateConsensusStates(ctx sdk.Context, cdc codec.BinaryCod
 			if err != nil {
 				return nil, sdkerrors.Wrapf(err, "decode timestamp error")
 			}
-			err = updateConsensuestate(clientStore, cdc, decodeHeader, uint64(decodeTimestamp))
+			height := clienttypes.NewHeight(clienttypes.ParseChainID(header.ChainId), uint64(decodeHeader.Number))
+			err = updateConsensuestate(clientStore, cdc, height, decodeHeader, uint64(decodeTimestamp))
 			if err != nil {
 				return nil, sdkerrors.Wrapf(clienttypes.ErrFailedClientConsensusStateVerification, "update consensus state failed")
 			}
-			//find latest header and timestmap
+			// find latest header and timestamp
 			if latestChainHeight < uint32(decodeHeader.Number) {
 				latestChainHeight = uint32(decodeHeader.Number)
-				latestBlockHeader = decodeHeader
-				latestTimestamp = uint64(decodeTimestamp)
+				latestChainid = header.ChainId
+				// latestBlockHeader = decodeHeader
+				// latestTimestamp = uint64(decodeTimestamp)
 			}
+			updatedHeights = append(updatedHeights, clienttypes.NewHeight(clienttypes.ParseChainID(header.ChainId), uint64(decodeHeader.Number)))
 		}
 
 	case beefy.CHAINTYPE_PARACHAIN:
@@ -249,52 +264,35 @@ func (cs ClientState) UpdateConsensusStates(ctx sdk.Context, cdc codec.BinaryCod
 			if err != nil {
 				return nil, sdkerrors.Wrapf(err, "decode timestamp error")
 			}
-			err = updateConsensuestate(clientStore, cdc, decodeHeader, uint64(decodeTimestamp))
+			height := clienttypes.NewHeight(clienttypes.ParseChainID(header.ChainId), uint64(decodeHeader.Number))
+			err = updateConsensuestate(clientStore, cdc, height, decodeHeader, uint64(decodeTimestamp))
+
 			if err != nil {
 				return nil, sdkerrors.Wrapf(clienttypes.ErrFailedClientConsensusStateVerification, "update consensus state failed")
 			}
-			//find latest header and timestmap
+			// find latest header and timestamp
 			if latestChainHeight < uint32(decodeHeader.Number) {
 				latestChainHeight = uint32(decodeHeader.Number)
-				latestBlockHeader = decodeHeader
-				latestTimestamp = uint64(decodeTimestamp)
+				latestChainid = header.ChainId
+				// latestBlockHeader = decodeHeader
+				// latestTimestamp = uint64(decodeTimestamp)
 			}
-
+			updatedHeights = append(updatedHeights, clienttypes.NewHeight(clienttypes.ParseChainID(header.ChainId), uint64(decodeHeader.Number)))
 		}
 	}
 
-	// TODO: asset blockheader and timestamp is not nil
-	newConsensueState = NewConsensusState(latestBlockHeader.StateRoot[:], time.UnixMilli(int64(latestTimestamp)))
-
 	// set metadata for this consensus
-	latestHeigh := clienttypes.Height{
-		RevisionNumber: 0,
-		RevisionHeight: uint64(latestChainHeight),
-	}
+	latestHeigh := clienttypes.NewHeight(clienttypes.ParseChainID(latestChainid), uint64(latestChainHeight))
 	setConsensusMetadata(ctx, clientStore, latestHeigh)
 	// TODO: consider to pruning!
 	//
-	return newConsensueState, nil
-
-}
-
-// UpdateState may be used to either create a consensus state for:
-// - a future height greater than the latest client state height
-// - a past height that was skipped during bisection
-// If we are updating to a past height, a consensus state is created for that height to be persisted in client store
-// If we are updating to a future height, the consensus state is created and the client state is updated to reflect
-// the new latest height
-// A list containing the updated consensus height is returned.
-// UpdateState must only be used to update within a single revision, thus header revision number and trusted height's revision
-// number must be the same. To update to a new revision, use a separate upgrade path
-// UpdateState will prune the oldest consensus state if it is expired.
-func (cs ClientState) UpdateState(ctx sdk.Context, cdc codec.BinaryCodec, clientStore sdk.KVStore, clientMsg exported.ClientMessage) []exported.Height {
-	// header, ok := clientMsg.(*Header)
-	panic("")
+	return updatedHeights, nil
 }
 
 // UpdateStateOnMisbehaviour updates state upon misbehaviour, freezing the ClientState. This method should only be called when misbehaviour is detected
 // as it does not perform any misbehaviour checks.
 func (cs ClientState) UpdateStateOnMisbehaviour(ctx sdk.Context, cdc codec.BinaryCodec, clientStore sdk.KVStore, _ exported.ClientMessage) {
-	panic("")
+	cs.FrozenHeight = FrozenHeight
+
+	clientStore.Set(host.ClientStateKey(), clienttypes.MustMarshalClientState(cdc, &cs))
 }

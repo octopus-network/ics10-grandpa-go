@@ -102,5 +102,6 @@ func (cs ClientState) VerifyUpgradeAndUpdateState(
 	upgradedClient exported.ClientState, upgradedConsState exported.ConsensusState,
 	proofUpgradeClient, proofUpgradeConsState []byte,
 ) error {
-	panic("")
+	// TODO： impl
+	return nil
 }

@@ -44,16 +44,21 @@ var (
 	KeyIteration = []byte("/iterationKey")
 )
 
-func updateConsensuestate(clientStore sdk.KVStore, cdc codec.BinaryCodec, decodeHeader types.Header, timestamp uint64) error {
+// setClientState stores the client state
+func setClientState(clientStore sdk.KVStore, cdc codec.BinaryCodec, clientState *ClientState) {
+	key := host.ClientStateKey()
+	val := clienttypes.MustMarshalClientState(cdc, clientState)
+	clientStore.Set(key, val)
+}
 
-	height := clienttypes.Height{
+func updateConsensuestate(clientStore sdk.KVStore, cdc codec.BinaryCodec, height clienttypes.Height, decodeHeader types.Header, timestamp uint64) error {
+	// height := clienttypes.Height{
 
-		RevisionNumber: uint64(0),
-		RevisionHeight: uint64(decodeHeader.Number),
-	}
+	// 	RevisionNumber: uint64(0),
+	// 	RevisionHeight: uint64(decodeHeader.Number),
+	// }
 
 	if consensusState, _ := GetConsensusState(clientStore, cdc, height); consensusState != nil {
-
 		return nil
 	}
 
@@ -119,7 +124,6 @@ func IterateConsensusMetadata(store sdk.KVStore, cb func(key, val []byte) bool) 
 		if len(keySplit) != 3 {
 			// ignore all consensus state keys
 			continue
-
 		}
 
 		if keySplit[2] != "processedTime" && keySplit[2] != "processedHeight" {
@@ -315,7 +319,7 @@ func PruneAllExpiredConsensusStates(
 	var heights []exported.Height
 
 	pruneCb := func(height exported.Height) bool {
-		//consState, err := GetConsensusState(clientStore, cdc, height)
+		// consState, err := GetConsensusState(clientStore, cdc, height)
 		// this error should never occur
 		// if err != nil {
 		// 	return true

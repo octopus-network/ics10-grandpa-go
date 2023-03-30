@@ -183,7 +183,6 @@ func (vfp *VersionedFinalityProof) Decode(decoder scale.Decoder) error {
 	case 1:
 		vfp.Version = 1
 		err = decoder.Decode(&vfp.SignedCommitment)
-
 	}
 
 	if err != nil {
@@ -204,7 +203,6 @@ func (vfp VersionedFinalityProof) Encode(encoder scale.Encoder) error {
 	case 1:
 		err1 = encoder.PushByte(1)
 		err2 = encoder.Encode(vfp.SignedCommitment)
-
 	}
 
 	if err1 != nil {
@@ -218,7 +216,6 @@ func (vfp VersionedFinalityProof) Encode(encoder scale.Encoder) error {
 }
 
 func main() {
-
 	api, err := gsrpc.NewSubstrateAPI(relay_chain_endpoint)
 	if err != nil {
 		// fmt.Printf("connection err,%s", err)

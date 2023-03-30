@@ -16,11 +16,10 @@ var _ exported.ClientMessage = &Header{}
 
 // ConsensusState returns the updated consensus state associated with the header
 func (h Header) ConsensusState() *ConsensusState {
-
-	//get latest header and time
-	latestHeader, latestTime, err := getLastestBlockHeader(h)
+	// get latest header and time
+	_, latestHeader, latestTime, err := getLastestChainHeader(&h)
 	if err != nil {
-		Logger.Error("LightClient:", "10-Grandpa", "method:", "getLastestHeader error: ", err)
+		logger.Sugar().Error("LightClient:", "10-Grandpa", "method:", "getLastestHeader error: ", err)
 		return nil
 	}
 	// build consensue state
@@ -39,42 +38,35 @@ func (h Header) ClientType() string {
 // header is nil.
 // NOTE: the header.Header is checked to be non nil in ValidateBasic.
 func (h Header) GetHeight() exported.Height {
-	// if err := h.ValidateBasic(); err != nil {
-	// 	return clienttypes.NewHeight(0, 0)
-	// }
-
 	// use the beefy height as header height
 	// latestBeefyHeight := h.BeefyMmr.SignedCommitment.Commitment.BlockNumber
-	//get latest header and time
-	latestHeader, _, err := getLastestBlockHeader(h)
+	// get latest header and time
+	chainID, latestHeader, _, err := getLastestChainHeader(&h)
 	if err != nil {
-		Logger.Error("LightClient:", "10-Grandpa", "method:", "GetHeight error: ", err)
+		logger.Sugar().Error("LightClient:", "10-Grandpa", "method:", "GetHeight error: ", err)
 		return nil
 	}
-	return clienttypes.NewHeight(0, uint64(latestHeader.Number))
-	// revision := clienttypes.ParseChainID(h.Header.ChainID)
-	// return clienttypes.NewHeight(revision, uint64(h.Header.Height))
+
+	revision := clienttypes.ParseChainID(chainID)
+	return clienttypes.NewHeight(revision, uint64(latestHeader.Number))
 }
 
 // // GetTime returns the current block timestamp. It returns a zero time if
 // // the tendermint header is nil.
 // // NOTE: the header.Header is checked to be non nil in ValidateBasic.
 func (h Header) GetTime() time.Time {
-	// if err := h.ValidateBasic(); err != nil {
-	// 	return time.Unix(0, 0)
-	// }
-	//get latest header and time
-	_, latestTime, err := getLastestBlockHeader(h)
-	Logger.Debug("latestTime:", latestTime)
+	// get latest header and time
+	_, _, latestTime, err := getLastestChainHeader(&h)
+	logger.Sugar().Debug("latestTime:", latestTime)
 	if err != nil {
-		Logger.Error("LightClient:", "10-Grandpa", "method:", "getLastestHeader error: ", err)
-		return time.Unix(0, 0)
+		logger.Sugar().Error("LightClient:", "10-Grandpa", "method:", "getLastestHeader error: ", err)
+		return time.UnixMilli(0)
 	}
 	return latestTime
-
 }
 
-func getLastestBlockHeader(h Header) (gsrpctypes.Header, time.Time, error) {
+func getLastestChainHeader(h *Header) (string, gsrpctypes.Header, time.Time, error) {
+	var chainID string
 	var latestHeader gsrpctypes.Header
 	var latestTimestamp time.Time
 	var latestHeight uint32
@@ -89,28 +81,29 @@ func getLastestBlockHeader(h Header) (gsrpctypes.Header, time.Time, error) {
 			}
 		}
 		subchainHeader := subchainHeaderMap[latestHeight]
+		chainID = subchainHeader.ChainId
 
 		// var decodeHeader gsrpctypes.Header
 		err := gsrpccodec.Decode(subchainHeader.BlockHeader, &latestHeader)
 		if err != nil {
-			return latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "decode header error")
+			return "", latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "decode header error")
 		}
-		Logger.Debug("decodeHeader.Number:", latestHeader.Number)
+		logger.Sugar().Debug("decodeHeader.Number:", latestHeader.Number)
 
 		// verify timestamp and get it
 		err = beefy.VerifyStateProof(subchainHeader.Timestamp.Proofs,
 			latestHeader.StateRoot[:], subchainHeader.Timestamp.Key,
 			subchainHeader.Timestamp.Value)
 		if err != nil {
-			Logger.Error("LightClient:", "10-Grandpa", "method:", "VerifyStateProof error: ", err)
-			return latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "verify timestamp error")
+			logger.Sugar().Error("LightClient:", "10-Grandpa", "method:", "VerifyStateProof error: ", err)
+			return "", latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "verify timestamp error")
 		}
-		//decode
+		// decode
 		var decodeTimestamp gsrpctypes.U64
 		err = gsrpccodec.Decode(subchainHeader.Timestamp.Value, &decodeTimestamp)
 		if err != nil {
-			Logger.Error("decode timestamp error:", err)
-			return latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "decode timestamp error")
+			logger.Sugar().Error("decode timestamp error:", err)
+			return "", latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "decode timestamp error")
 		}
 		latestTimestamp = time.UnixMilli(int64(decodeTimestamp))
 
@@ -122,10 +115,11 @@ func getLastestBlockHeader(h Header) (gsrpctypes.Header, time.Time, error) {
 			}
 		}
 		parachainHeader := parachainHeaderMap[latestHeight]
+		chainID = parachainHeader.ChainId
 		// var decodeHeader gsrpctypes.Header
 		err := gsrpccodec.Decode(parachainHeader.BlockHeader, &latestHeader)
 		if err != nil {
-			return latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "decode header error")
+			return "", latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "decode header error")
 		}
 
 		// verify timestamp and get it
@@ -133,21 +127,21 @@ func getLastestBlockHeader(h Header) (gsrpctypes.Header, time.Time, error) {
 			latestHeader.StateRoot[:], parachainHeader.Timestamp.Key,
 			parachainHeader.Timestamp.Value)
 		if err != nil {
-			Logger.Error("LightClient:", "10-Grandpa", "method:", "VerifyStateProof error: ", err)
-			return latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "verify timestamp error")
+			logger.Sugar().Error("LightClient:", "10-Grandpa", "method:", "VerifyStateProof error: ", err)
+			return "", latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "verify timestamp error")
 		}
-		//decode
+		// decode
 		var decodeTimestamp gsrpctypes.U64
 		err = gsrpccodec.Decode(parachainHeader.Timestamp.Value, &decodeTimestamp)
 		if err != nil {
-			Logger.Error("decode timestamp error:", err)
-			return latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "decode timestamp error")
+			logger.Sugar().Error("decode timestamp error:", err)
+			return "", latestHeader, latestTimestamp, sdkerrors.Wrapf(err, "decode timestamp error")
 		}
 		latestTimestamp = time.UnixMilli(int64(decodeTimestamp))
 
 	}
 
-	return latestHeader, latestTimestamp, nil
+	return chainID, latestHeader, latestTimestamp, nil
 }
 
 // ValidateBasic calls the header ValidateBasic function and checks

@@ -1,21 +1,88 @@
 package grandpa
 
 import (
-	"os"
-
 	"github.com/octopus-network/beefy-go/beefy"
-	"github.com/tendermint/tendermint/libs/log"
 
 	// log "github.com/go-kit/log"
 	"github.com/ComposableFi/go-merkle-trees/mmr"
 	gsrpctypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/natefinch/lumberjack"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // var logger = log.Logger.With("light-client/10-grandpa/client_state")
-var Logger = log.NewTMLogger(os.Stderr)
+// var Logger = log.NewTMLogger(os.Stderr)
+var logger *zap.Logger
+
+func init() {
+	InitLogger("../ics10.log", "debug")
+}
+
+// logpath 日志文件路径
+// loglevel 日志级别
+func InitLogger(logpath string, loglevel string) {
+	// 日志分割
+	hook := lumberjack.Logger{
+		Filename:   logpath, // 日志文件路径，默认 os.TempDir()
+		MaxSize:    10,      // 每个日志文件保存10M，默认 100M
+		MaxBackups: 30,      // 保留30个备份，默认不限
+		MaxAge:     7,       // 保留7天，默认不限
+		Compress:   true,    // 是否压缩，默认不压缩
+	}
+	write := zapcore.AddSync(&hook)
+	// 设置日志级别
+	// debug 可以打印出 info debug warn
+	// info  级别可以打印 warn info
+	// warn  只能打印 warn
+	// debug->info->warn->error
+	var level zapcore.Level
+	switch loglevel {
+	case "debug":
+		level = zap.DebugLevel
+	case "info":
+		level = zap.InfoLevel
+	case "error":
+		level = zap.ErrorLevel
+	default:
+		level = zap.InfoLevel
+	}
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "time",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "linenum",
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,  // 小写编码器
+		EncodeTime:     zapcore.ISO8601TimeEncoder,     // ISO8601 UTC 时间格式
+		EncodeDuration: zapcore.SecondsDurationEncoder, //
+		EncodeCaller:   zapcore.FullCallerEncoder,      // 全路径编码器
+		EncodeName:     zapcore.FullNameEncoder,
+	}
+	// 设置日志级别
+	atomicLevel := zap.NewAtomicLevel()
+	atomicLevel.SetLevel(level)
+	core := zapcore.NewCore(
+		// zapcore.NewConsoleEncoder(encoderConfig),
+		zapcore.NewJSONEncoder(encoderConfig),
+		// zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), zapcore.AddSync(&write)), // 打印到控制台和文件
+		write,
+		level,
+	)
+	// 开启开发模式，堆栈跟踪
+	caller := zap.AddCaller()
+	// 开启文件及行号
+	development := zap.Development()
+	// 设置初始化字段,如：添加一个服务器名称
+	field := zap.Fields(zap.String("serviceName", "serviceName"))
+	// 构造日志
+	logger = zap.New(core, caller, development, field)
+	logger.Info("DefaultLogger init success")
+}
 
 func ToPBBeefyMMR(bsc beefy.SignedCommitment, mmrBatchProof beefy.MmrProofsResp, authorityProof [][]byte) BeefyMMR {
-
 	// bsc := beefy.ConvertCommitment(sc)
 	pbPalyloads := make([]PayloadItem, len(bsc.Commitment.Payload))
 	for i, v := range bsc.Commitment.Payload {
@@ -23,7 +90,6 @@ func ToPBBeefyMMR(bsc beefy.SignedCommitment, mmrBatchProof beefy.MmrProofsResp,
 			Id:   v.ID[:],
 			Data: v.Data,
 		}
-
 	}
 
 	pbCommitment := Commitment{
@@ -134,7 +200,6 @@ func ToBeefySC(pbsc SignedCommitment) beefy.SignedCommitment {
 }
 
 func ToBeefyMMRLeaves(pbMMRLeaves []MMRLeaf) []gsrpctypes.MMRLeaf {
-
 	beefyMMRLeaves := make([]gsrpctypes.MMRLeaf, len(pbMMRLeaves))
 	for i, v := range pbMMRLeaves {
 		beefyMMRLeaves[i] = gsrpctypes.MMRLeaf{
@@ -175,14 +240,13 @@ func ToMMRBatchProof(mmrLeavesAndBatchProof MMRLeavesAndBatchProof) beefy.MMRBat
 	}
 
 	return mmrBatchProof
-
 }
 
-func ToPBSolochainHeaderMap(subchainHeaderMap map[uint32]beefy.SubchainHeader) Header_SubchainHeaderMap {
-
+func ToPBSubchainHeaderMap(chainID string, subchainHeaderMap map[uint32]beefy.SubchainHeader) Header_SubchainHeaderMap {
 	headerMap := make(map[uint32]SubchainHeader)
 	for num, header := range subchainHeaderMap {
 		headerMap[num] = SubchainHeader{
+			ChainId:     chainID,
 			BlockHeader: header.BlockHeader,
 			Timestamp:   StateProof(header.Timestamp),
 		}
@@ -196,14 +260,13 @@ func ToPBSolochainHeaderMap(subchainHeaderMap map[uint32]beefy.SubchainHeader) H
 		SubchainHeaderMap: &pbSubchainHeaderMap,
 	}
 	return header_subchainMap
-
 }
 
-func ToPBParachainHeaderMap(parachainHeaderMap map[uint32]beefy.ParachainHeader) Header_ParachainHeaderMap {
-
+func ToPBParachainHeaderMap(chainID string, parachainHeaderMap map[uint32]beefy.ParachainHeader) Header_ParachainHeaderMap {
 	headerMap := make(map[uint32]ParachainHeader)
 	for num, header := range parachainHeaderMap {
 		headerMap[num] = ParachainHeader{
+			ChainId:     chainID,
 			ParachainId: header.ParaId,
 			BlockHeader: header.BlockHeader,
 			Proofs:      header.Proof,
@@ -221,5 +284,4 @@ func ToPBParachainHeaderMap(parachainHeaderMap map[uint32]beefy.ParachainHeader)
 		ParachainHeaderMap: &gParachainHeaderMap,
 	}
 	return header_parachainMap
-
 }

@@ -3,19 +3,20 @@ package grandpa_test
 import (
 	time "time"
 
-	ibcgptypes "github.com/octopus-network/ics10-grandpa-go/grandpa"
+	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
 	"github.com/dablelv/go-huge-util/conv"
+	ibcgptypes "github.com/octopus-network/ics10-grandpa-go/grandpa"
 )
 
 var gpClientState = ibcgptypes.ClientState{
-	ChainType:            0,
-	ChainId:              "solosub-0",
-	ParachainId:          0,
-	BeefyActivationBlock: 0,
-	LatestBeefyHeight:    15228,
-	MmrRootHash:          conv.SplitStrToSlice[byte]("131 79 104 195 33 161 208 242 156 164 3 120 80 122 102 198 67 105 240 96 40 47 16 197 136 94 190 101 145 9 176 52", " "),
-	LatestChainHeight:    15228,
-	FrozenHeight:         0,
+	ChainType:             0,
+	ChainId:               chainID,
+	ParachainId:           0,
+	BeefyActivationHeight: 0,
+	LatestBeefyHeight:     clienttypes.NewHeight(clienttypes.ParseChainID(chainID), 15228),
+	MmrRootHash:           conv.SplitStrToSlice[byte]("131 79 104 195 33 161 208 242 156 164 3 120 80 122 102 198 67 105 240 96 40 47 16 197 136 94 190 101 145 9 176 52", " "),
+	LatestChainHeight:     clienttypes.NewHeight(clienttypes.ParseChainID(chainID), 15228),
+	FrozenHeight:          clienttypes.NewHeight(clienttypes.ParseChainID(chainID), 0),
 	AuthoritySet: ibcgptypes.BeefyAuthoritySet{
 		Id:   1522,
 		Len:  5,
@@ -34,11 +35,13 @@ var payloads = []ibcgptypes.PayloadItem{
 		Data: conv.SplitStrToSlice[byte]("31 52 208 2 3 182 252 155 182 210 209 187 127 178 123 44 217 192 102 62 47 189 24 87 59 135 216 57 171 69 148 102", " "),
 	},
 }
+
 var commitment = ibcgptypes.Commitment{
 	Payloads:       payloads,
 	BlockNumber:    15230,
 	ValidatorSetId: 1523,
 }
+
 var sinatures = []ibcgptypes.Signature{
 	{
 		Index:     0,
@@ -66,6 +69,7 @@ var signedCommitment = ibcgptypes.SignedCommitment{
 var signatureProofs = [][]byte{
 	conv.SplitStrToSlice[byte]("80 189 211 172 79 84 160 71 2 160 85 195 51 3 2 91 32 56 68 108 115 52 237 59 51 65 243 16 240 82 17 111", " "),
 }
+
 var leaves = []ibcgptypes.MMRLeaf{
 	{
 		Version: 0,
@@ -81,6 +85,7 @@ var leaves = []ibcgptypes.MMRLeaf{
 		ParachainHeads: conv.SplitStrToSlice[byte]("0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0", " "),
 	},
 }
+
 var mmrProofs = ibcgptypes.MMRBatchProof{
 	LeafIndexes: []uint64{15228},
 	LeafCount:   15230,
@@ -108,6 +113,7 @@ var timestamp = ibcgptypes.StateProof{
 		conv.SplitStrToSlice[byte]("158 195 101 195 207 89 214 113 235 114 218 14 122 65 19 196 16 2 80 95 14 123 144 18 9 107 65 196 235 58 175 148 127 110 164 41 8 0 0 104 95 15 31 5 21 244 98 205 207 132 224 241 214 4 93 252 187 32 65 226 27 223 134 1 0 0", " "),
 	},
 }
+
 var subchainHeaderMap = ibcgptypes.SubchainHeaderMap{
 	SubchainHeaderMap: map[uint32]ibcgptypes.SubchainHeader{
 		15228: {
@@ -178,7 +184,6 @@ func (suite *GrandpaTestSuite) TestMsgConsensuseState() {
 	suite.Suite.T().Logf("unmarshal consensusState timestamp: %+v", unmarshalCS.Timestamp.UnixMilli())
 	suite.Suite.T().Logf("raw consensusState timestamp: %+v", consensusState.Timestamp.UnixMilli())
 	suite.Equal(consensusState.Timestamp.UnixMilli(), unmarshalCS.Timestamp.UnixMilli())
-
 }
 
 func (suite *GrandpaTestSuite) TestMsgBeefyMMR() {
