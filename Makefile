@@ -17,10 +17,6 @@ help: Makefile
 	@sed -n 's/^##//p' $< | column -t -s ':' |  sed -e 's/^/ /'
 	@echo
 
-proto-gen:
-	@echo "Generating Protobuf files"
-	@ ./scripts/compile-ics10-pb.sh
-
 ###############################################################################
 ###                                Linting                                  ###
 ###############################################################################
@@ -47,5 +43,10 @@ go.sum: go.mod
 	go mod verify
 	go mod tidy
 
+###############################################################################
+###                                Protobuf                                 ###
+###############################################################################
 
-
+proto-gen:
+	@echo "Generating Protobuf files"
+	@ ./scripts/compile-ics10-pb.sh
