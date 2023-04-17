@@ -148,7 +148,7 @@ func (suite *GrandpaTestSuite) TestSubchainLocalNet() {
 
 			// step3, build header proof
 			// build subchain header map
-			subchainHeaderMap, err := beefy.BuildSubchainHeaderMap(localSubchainEndpoint, mmrBatchProof.Proof.LeafIndexes)
+			subchainHeaderMap, err := beefy.BuildSubchainHeaderMap(localSubchainEndpoint, mmrBatchProof.Proof.LeafIndexes, "sub-0")
 			suite.Require().NoError(err)
 			suite.Suite.T().Logf("subchainHeaderMap: %+v", subchainHeaderMap)
 			suite.Suite.T().Logf("subchainHeaderMap: %#v", subchainHeaderMap)
@@ -338,7 +338,7 @@ func (suite *GrandpaTestSuite) TestParachainLocalNet() {
 	if err != nil {
 		suite.Suite.T().Logf("Connecting err: %v", err)
 	}
-	suite.Suite.T().Logf("subscribed to parachain %s\n", beefy.LOCAL_RELAY_ENDPPOIT)
+	suite.Suite.T().Logf("subscribed to parachain %s\n", beefy.LOCAL_PARACHAIN_ENDPOINT)
 
 	timeout := time.After(24 * time.Hour)
 	received := 0
@@ -495,7 +495,7 @@ func (suite *GrandpaTestSuite) TestParachainLocalNet() {
 			// step3, build header proof
 			// build parachain header proof and verify that proof
 			parachainHeaderMap, err := beefy.BuildParachainHeaderMap(localRelayEndpoint, localParachainEndpoint,
-				mmrBatchProof.Proof.LeafIndexes, beefy.LOCAL_PARACHAIN_ID)
+				mmrBatchProof.Proof.LeafIndexes, "parachain-1", beefy.LOCAL_PARACHAIN_ID)
 			suite.Require().NoError(err)
 			suite.Suite.T().Logf("parachainHeaderMap: %+v", parachainHeaderMap)
 
